@@ -131,7 +131,7 @@ jobs:
         fi
 
         if [ ${{ env.NDK_VERSION }} = 15 ]; then
-             wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r15c-linux-x86_64.zip
+             wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r15b-linux-x86_64.zip
              unzip ndk.zip -d tool/
         fi
         cd ./tool
@@ -251,6 +251,13 @@ jobs:
        else
            echo "Kernel output file is empty"
            exit 1
+       
+       if [ -f android-kernel/out/drivers/staging/prima/wlan.ko ]; then
+           echo "WLAN.KO_IS_OK=true" >> $GITHUB_ENV
+       else
+           echo "WLAN.KO output file is empty"
+           exit 1
+       
        fi
        if [ ${{ env.NEED_DTBO }} = true ]; then
            if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img ]; then
@@ -296,6 +303,13 @@ jobs:
         name: ${{ env.KERNEL_IMAGE_NAME }}${{ env.UPLOADNAME }}-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
         path: kernel_workspace/android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }}
 
+    - name: Upload wlan.ko
+      if: env.WLAN.KO_IS_OK == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: wlan.ko
+        path: kernel_workspace/android-kernel/out/drivers/staging/prima/wlan.ko
+    
     - name: Upload AnyKernel3
       if: env.CHECK_FILE_IS_OK == 'true'
       uses: actions/upload-artifact@v4

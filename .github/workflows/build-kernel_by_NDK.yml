@@ -71,6 +71,11 @@ jobs:
         sudo apt install -y python2 lld gcc binutils-arm-linux-gnueabi binutils-aarch64-linux-gnu curl wget vim git ccache automake flex lzop bison gperf build-essential zip zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler kmod python3 python3-pip
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
+    - name: 切换python2.7
+      run: |
+        sudo rm -f /usr/bin/python
+        sudo ln -s /usr/bin/python2.7 /usr/bin/python
+    
     - name: Download Android NDK
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
@@ -131,7 +136,12 @@ jobs:
         fi
 
         if [ ${{ env.NDK_VERSION }} = 15 ]; then
-             wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r15b-linux-x86_64.zip
+             wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r15c-linux-x86_64.zip
+             unzip ndk.zip -d tool/
+        fi
+
+        if [ ${{ env.NDK_VERSION }} = 13 ]; then
+             wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r13b-linux-x86_64.zip
              unzip ndk.zip -d tool/
         fi
         cd ./tool
@@ -236,8 +246,8 @@ jobs:
         fi
 
         if [ -f $GITHUB_WORKSPACE/kernel_workspace/tool/NDK/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64/bin/aarch64-linux-android-ld ]; then
-            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CC=clang CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- CLANG_TRIPLE=aarch64-linux-gnu- ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.KERNEL_CONFIG }}
-            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CC=clang CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- CLANG_TRIPLE=aarch64-linux-gnu- ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} 
+            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CROSS_COMPILE=aarch64-linux-android- ${{ env.KERNEL_CONFIG }}
+            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CROSS_COMPILE=aarch64-linux-android- 
         else
             make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.KERNEL_CONFIG }}
             make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} 
@@ -251,13 +261,6 @@ jobs:
        else
            echo "Kernel output file is empty"
            exit 1
-       
-       if [ -f android-kernel/out/drivers/staging/prima/wlan.ko ]; then
-           echo "WLAN.KO_IS_OK=true" >> $GITHUB_ENV
-       else
-           echo "WLAN.KO output file is empty"
-           exit 1
-       
        fi
        if [ ${{ env.NEED_DTBO }} = true ]; then
            if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img ]; then
@@ -277,6 +280,7 @@ jobs:
         sed -i 's!block=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!block=auto;!g' AnyKernel3/anykernel.sh
         sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
         cp android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} AnyKernel3/
+        cp android-kernel/out/drivers/staging/prima/wlan.ko AnyKernel3/modules/system/lib/modules/
         if [ ${{ env.CHECK_DTBO_IS_OK }} = true ]; then
             cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img AnyKernel3/
         fi
@@ -302,13 +306,6 @@ jobs:
       with:
         name: ${{ env.KERNEL_IMAGE_NAME }}${{ env.UPLOADNAME }}-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
         path: kernel_workspace/android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }}
-
-    - name: Upload wlan.ko
-      if: env.WLAN.KO_IS_OK == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: wlan.ko
-        path: kernel_workspace/android-kernel/out/drivers/staging/prima/wlan.ko
     
     - name: Upload AnyKernel3
       if: env.CHECK_FILE_IS_OK == 'true'
